@@ -85,6 +85,10 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/ScriptEngine.h"		// For TheScriptEngine - jkmcd
 
+#ifdef RTS_HAS_IMGUI
+#include "GameClient/GameImGuiDebugWindows.h"
+#endif
+
 #define DRAWABLE_HASH_SIZE	8192
 
 /// The GameClient singleton instance
@@ -241,6 +245,11 @@ void GameClient::init()
 {
 
 	setFrameRate(MSEC_PER_LOGICFRAME_REAL);		// from GameCommon.h... tell W3D what our expected framerate is
+
+#ifdef RTS_HAS_IMGUI
+	// TheSuperHackers @feature zhp47 15/04/2026 Register game-specific ImGui debug windows.
+	GameImGuiDebugWindows::Register();
+#endif
 
 	INI ini;
 	// Load the DrawGroupInfo here, before the Display Manager is loaded.

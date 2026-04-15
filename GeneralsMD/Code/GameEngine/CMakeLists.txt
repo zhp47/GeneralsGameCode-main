@@ -691,6 +691,7 @@ set(GAMEENGINE_SRC
 #    Source/GameClient/FXList.cpp
     Source/GameClient/GameClient.cpp
     Source/GameClient/GameClientDispatch.cpp
+    Source/GameClient/GameImGuiDebugWindows.cpp
 #    Source/GameClient/GameText.cpp
 #    Source/GameClient/GlobalLanguage.cpp
 #    Source/GameClient/GraphDraw.cpp

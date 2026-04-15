@@ -19,9 +19,16 @@
 #include "ImGuiDebugMenu.h"
 #include "imgui.h"
 
+rts::ImGui::DebugMenu::DrawCallback rts::ImGui::DebugMenu::s_gameDrawCallback = nullptr;
+bool rts::ImGui::DebugMenu::s_showGameDebug = false;
 bool rts::ImGui::DebugMenu::s_showDemoWindow = false;
 bool rts::ImGui::DebugMenu::s_showMetrics = false;
 bool rts::ImGui::DebugMenu::s_showStyleEditor = false;
+
+void rts::ImGui::DebugMenu::SetGameDrawCallback(DrawCallback cb)
+{
+    s_gameDrawCallback = cb;
+}
 
 // Draw the master debug menu and any sub-windows toggled by the user.
 // New debug windows are added by:
@@ -40,6 +47,8 @@ void rts::ImGui::DebugMenu::Draw()
         ::ImGui::Text("FPS: %.1f (%.3f ms)", ::ImGui::GetIO().Framerate, 1000.0f / ::ImGui::GetIO().Framerate);
         ::ImGui::Separator();
 
+        if (s_gameDrawCallback)
+            ::ImGui::Checkbox("Game Debug", &s_showGameDebug);
         ::ImGui::Checkbox("Demo Window", &s_showDemoWindow);
         ::ImGui::Checkbox("Metrics / Debugger", &s_showMetrics);
         ::ImGui::Checkbox("Style Editor", &s_showStyleEditor);
@@ -59,4 +68,8 @@ void rts::ImGui::DebugMenu::Draw()
         ::ImGui::ShowStyleEditor();
         ::ImGui::End();
     }
+
+    // Game-specific debug windows registered from the GameEngine layer.
+    if (s_showGameDebug && s_gameDrawCallback)
+        s_gameDrawCallback();
 }
