@@ -33,6 +33,7 @@ set(IMGUI_PLATFORM_SRCS
 set(IMGUI_WRAPPER_SRCS
     "${CMAKE_CURRENT_LIST_DIR}/wrapper/ImGuiFrameManager.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/wrapper/ImGuiContextManager.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/wrapper/ImGuiDebugMenu.cpp"
 )
 
 set(IMGUI_INCLUDE_DIRS

@@ -24,26 +24,18 @@ namespace rts
 namespace ImGui
 {
 
-// Owns the ImGui context and both platform/renderer backends.
-// Exactly one instance should exist for the lifetime of ImGui usage (typically
-// a static in dx8wrapper.cpp). Call Init() once with the Win32 HWND and the
-// IDirect3DDevice8 pointer. The destructor tears everything down in the
-// correct reverse order: renderer backend -> platform backend -> context.
-class ContextManager
+// Central hub for all ImGui debug windows. Call Draw() once per frame between
+// BeginFrame/EndFrame. Renders the master menu and any sub-windows the user
+// has enabled via checkboxes.
+class DebugMenu
 {
   public:
-    ContextManager();
-    ~ContextManager();
-
-    // Set up the ImGui context and both backends. Safe to call only once;
-    // subsequent calls are no-ops. hwnd = the game's main HWND, device = IDirect3DDevice8*.
-    void Init(void *hwnd, void *device);
+    static void Draw();
 
   private:
-    bool m_initialized;
-
-    ContextManager(const ContextManager &) = delete;
-    ContextManager &operator=(const ContextManager &) = delete;
+    static bool s_showDemoWindow;
+    static bool s_showMetrics;
+    static bool s_showStyleEditor;
 };
 
 } // namespace ImGui

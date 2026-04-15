@@ -48,6 +48,9 @@ thumbs.db
 /.vscode
 /Dependencies/MaxSDK/maxsdk
 /tmp/
+/pics/
+/plan/
+imgui.note
 
 ## AI assistant config (user-specific)
 /.claude/

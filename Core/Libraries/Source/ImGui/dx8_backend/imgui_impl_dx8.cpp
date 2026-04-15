@@ -391,6 +391,11 @@ void ImGui_ImplDX8_RenderDrawData(ImDrawData *draw_data)
     int global_vtx_offset = 0;
     int global_idx_offset = 0;
     ImVec2 clip_off = draw_data->DisplayPos;
+
+    // TheSuperHackers @performance zhp47 15/04/2026 Cache the last clip rect to avoid
+    // rebuilding the stencil mask quad when consecutive draw commands share the same region.
+    RECT lastClipRect = {-1, -1, -1, -1};
+
     for (int n = 0; n < draw_data->CmdListsCount; n++)
     {
         const ImDrawList *cmd_list = draw_data->CmdLists[n];
@@ -422,7 +427,13 @@ void ImGui_ImplDX8_RenderDrawData(ImDrawData *draw_data)
 
                 // Stencil-based clipping: DX8 lacks SetScissorRect, so we emulate it.
                 // Pass 1: Write the clipping quad into the stencil buffer (color writes off).
-                build_mask_vbuffer(&r);
+                // Skip mask rebuild if the clip rect is unchanged from the previous draw command.
+                if (r.left != lastClipRect.left || r.top != lastClipRect.top ||
+                    r.right != lastClipRect.right || r.bottom != lastClipRect.bottom)
+                {
+                    lastClipRect = r;
+                    build_mask_vbuffer(&r);
+                }
                 bd->pd3dDevice->SetRenderState(D3DRS_COLORWRITEENABLE, 0);
                 bd->pd3dDevice->SetRenderState(D3DRS_ZENABLE, true);
                 bd->pd3dDevice->SetRenderState(D3DRS_STENCILENABLE, true);
@@ -563,7 +574,15 @@ bool ImGui_ImplD3D8_CreateDepthStencilBuffer()
     {
         return false;
     }
-    if (bd->DepthBuffer == nullptr)
+
+    // TheSuperHackers @bugfix zhp47 15/04/2026 Release existing surface before creating
+    // a new one to prevent a leak if called twice without InvalidateDeviceObjects.
+    if (bd->DepthBuffer)
+    {
+        bd->DepthBuffer->Release();
+        bd->DepthBuffer = nullptr;
+    }
+
     {
         IDirect3DSurface8 *realDepth;
         D3DSURFACE_DESC sfcDesc;

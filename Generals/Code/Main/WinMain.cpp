@@ -71,6 +71,8 @@
 // TheSuperHackers @feature zhp47 15/04/2026 Forward Win32 messages to ImGui for input handling.
 #ifdef RTS_HAS_IMGUI
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+extern bool g_imguiVisible;
+#include <imgui.h>
 #endif
 
 
@@ -302,9 +304,26 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 	try
 	{
 #ifdef RTS_HAS_IMGUI
-		// TheSuperHackers @feature zhp47 15/04/2026 Let ImGui handle input events it cares about.
-		if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
-			return true;
+		// TheSuperHackers @feature zhp47 15/04/2026 Toggle ImGui overlay with F11.
+		if (message == WM_KEYDOWN && wParam == VK_F11)
+		{
+			g_imguiVisible = !g_imguiVisible;
+			return 0;
+		}
+
+		// TheSuperHackers @feature zhp47 15/04/2026 Forward input to ImGui when overlay is visible.
+		// Use WantCaptureMouse/WantCaptureKeyboard to decide whether the game also sees the event.
+		if (g_imguiVisible)
+		{
+			ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam);
+
+			const ImGuiIO &io = ImGui::GetIO();
+			bool isMouseMsg = (message >= WM_MOUSEFIRST && message <= WM_MOUSELAST);
+			bool isKeyMsg = (message >= WM_KEYFIRST && message <= WM_KEYLAST) || message == WM_CHAR;
+
+			if ((isMouseMsg && io.WantCaptureMouse) || (isKeyMsg && io.WantCaptureKeyboard))
+				return 0;
+		}
 #endif
 
 		// First let the IME manager do it's stuff.

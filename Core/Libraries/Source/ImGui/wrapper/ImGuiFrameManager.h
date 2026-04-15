@@ -52,11 +52,9 @@ class FrameGuard
 
     ~FrameGuard() { FrameManager::EndFrame(); }
 
-    // TODO change this to rule of 5 and use delete instead of declaring without
-    // definition once we are using a C++11 or higher C++ Standard
   private:
-    FrameGuard(const FrameGuard &);
-    FrameGuard &operator=(const FrameGuard &);
+    FrameGuard(const FrameGuard &) = delete;
+    FrameGuard &operator=(const FrameGuard &) = delete;
 };
 } // namespace ImGui
 } // namespace rts

@@ -56,8 +56,19 @@ void rts::ImGui::ContextManager::Init(void *hwnd, void *device)
 
     ::ImGui::StyleColorsDark();
 
-    ImGui_ImplWin32_Init(static_cast<HWND>(hwnd));
-    ImGui_ImplDX8_Init(static_cast<IDirect3DDevice8 *>(device));
+    // TheSuperHackers @bugfix zhp47 15/04/2026 Check backend init return values
+    // to avoid calling Shutdown on uninitialized backends in the destructor.
+    bool win32Ok = ImGui_ImplWin32_Init(static_cast<HWND>(hwnd));
+    bool dx8Ok = ImGui_ImplDX8_Init(static_cast<IDirect3DDevice8 *>(device));
+    if (!win32Ok || !dx8Ok)
+    {
+        if (dx8Ok)
+            ImGui_ImplDX8_Shutdown();
+        if (win32Ok)
+            ImGui_ImplWin32_Shutdown();
+        ::ImGui::DestroyContext();
+        return;
+    }
 
     io.Fonts->AddFontDefault();
 

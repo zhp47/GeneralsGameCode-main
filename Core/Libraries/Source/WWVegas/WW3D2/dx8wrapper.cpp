@@ -91,9 +91,13 @@
 #ifdef RTS_HAS_IMGUI
 #include "ImGuiContextManager.h"
 #include "ImGuiFrameManager.h"
+#include "ImGuiDebugMenu.h"
 #include "imgui_impl_dx8.h"
 #include <imgui.h>
 static rts::ImGui::ContextManager s_imguiContextManager;
+
+// Visibility toggle for the ImGui debug overlay. Controlled by F11 in WndProc.
+bool g_imguiVisible = false;
 #endif
 
 const int DEFAULT_RESOLUTION_WIDTH = 640;
@@ -1689,7 +1693,8 @@ void DX8Wrapper::Begin_Scene()
 
 #ifdef RTS_HAS_IMGUI
 	// TheSuperHackers @feature zhp47 15/04/2026 Start new ImGui frame after D3D scene begins.
-	rts::ImGui::FrameManager::BeginFrame();
+	if (g_imguiVisible)
+		rts::ImGui::FrameManager::BeginFrame();
 #endif
 
 	DX8WebBrowser::Update();
@@ -1700,11 +1705,12 @@ void DX8Wrapper::End_Scene(bool flip_frames)
 	DX8_THREAD_ASSERT();
 
 #ifdef RTS_HAS_IMGUI
-	// TheSuperHackers @feature zhp47 15/04/2026 Show the ImGui demo window for integration testing.
-	// This is temporary and will be replaced by the debug menu.
-	ImGui::ShowDemoWindow();
-	// TheSuperHackers @feature zhp47 15/04/2026 Finalize and render ImGui draw data before D3D scene ends.
-	rts::ImGui::FrameManager::EndFrame();
+	// TheSuperHackers @feature zhp47 15/04/2026 Draw debug menu and finalize ImGui frame.
+	if (g_imguiVisible)
+	{
+		rts::ImGui::DebugMenu::Draw();
+		rts::ImGui::FrameManager::EndFrame();
+	}
 #endif
 
 	DX8CALL(EndScene());
