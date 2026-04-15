@@ -95,6 +95,13 @@
 
 #include <d3dx8.h>
 
+#ifdef RTS_HAS_IMGUI
+// TheSuperHackers @feature zhp47 15/04/2026 ImGui input forwarding for WorldBuilder.
+extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+extern bool g_imguiVisible;
+#include <imgui.h>
+#endif
+
 
 // ----------------------------------------------------------------------------
 // Misc. Forward Declarations
@@ -2121,6 +2128,34 @@ BEGIN_MESSAGE_MAP(WbView3d, WbView)
 	ON_UPDATE_COMMAND_UI(ID_VIEW_SHOWAMBIENTSOUNDS, OnUpdateViewShowAmbientSounds)
 	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
+
+// TheSuperHackers @feature zhp47 15/04/2026 Forward Win32 messages to ImGui for input handling.
+// F11 toggles ImGui visibility. When visible, mouse and keyboard events are forwarded and
+// consumed if ImGui wants them, preventing WorldBuilder tools from receiving stale input.
+LRESULT WbView3d::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
+{
+#ifdef RTS_HAS_IMGUI
+	if (message == WM_KEYDOWN && wParam == VK_F11)
+	{
+		g_imguiVisible = !g_imguiVisible;
+		return 0;
+	}
+
+	if (g_imguiVisible)
+	{
+		ImGui_ImplWin32_WndProcHandler(m_hWnd, message, wParam, lParam);
+
+		const ImGuiIO &io = ImGui::GetIO();
+		bool isMouseMsg = (message >= WM_MOUSEFIRST && message <= WM_MOUSELAST);
+		bool isKeyMsg = (message >= WM_KEYFIRST && message <= WM_KEYLAST) || message == WM_CHAR;
+
+		if ((isMouseMsg && io.WantCaptureMouse) || (isKeyMsg && io.WantCaptureKeyboard))
+			return 0;
+	}
+#endif
+
+	return WbView::WindowProc(message, wParam, lParam);
+}
 
 // ----------------------------------------------------------------------------
 // WbView3d drawing

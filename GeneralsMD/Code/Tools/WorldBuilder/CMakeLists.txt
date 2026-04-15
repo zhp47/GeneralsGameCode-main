@@ -223,6 +223,7 @@ target_link_libraries(z_worldbuilder PRIVATE
     vfw32
     winmm
     core_browserdispatch
+    lib_imgui
     z_gameengine
     z_gameenginedevice
     zi_always

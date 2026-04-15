@@ -217,6 +217,7 @@ target_link_libraries(g_worldbuilder PRIVATE
     g_gameenginedevice
     gi_always
     imm32
+    lib_imgui
     vfw32
     winmm
 )

@@ -77,6 +77,7 @@ public:
 	//{{AFX_VIRTUAL(WbView3d)
 	protected:
 	virtual void OnDraw(CDC* pDC) override;      // overridden to draw this view
+	virtual LRESULT WindowProc(UINT message, WPARAM wParam, LPARAM lParam) override;
 	//}}AFX_VIRTUAL
 
 // Implementation
