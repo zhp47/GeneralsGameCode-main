@@ -18,6 +18,7 @@ target_link_libraries(g_generals PRIVATE
     g_gameenginedevice
     gi_always
     imm32
+    lib_imgui
     milesstub
     vfw32
     winmm

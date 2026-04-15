@@ -71,6 +71,11 @@
 #include "Common/MiniDumper.h"
 #endif
 
+// TheSuperHackers @feature zhp47 15/04/2026 Forward Win32 messages to ImGui for input handling.
+#ifdef RTS_HAS_IMGUI
+extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+#endif
+
 
 // GLOBALS ////////////////////////////////////////////////////////////////////
 HINSTANCE ApplicationHInstance = nullptr;  ///< our application instance
@@ -299,6 +304,12 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 
 	try
 	{
+#ifdef RTS_HAS_IMGUI
+		// TheSuperHackers @feature zhp47 15/04/2026 Let ImGui handle input events it cares about.
+		if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+			return true;
+#endif
+
 		// First let the IME manager do it's stuff.
 		if ( TheIMEManager )
 		{

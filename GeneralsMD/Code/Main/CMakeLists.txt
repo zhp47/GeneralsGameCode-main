@@ -17,6 +17,7 @@ target_link_libraries(z_generals PRIVATE
     dinput8
     dxguid
     imm32
+    lib_imgui
     milesstub
     vfw32
     winmm

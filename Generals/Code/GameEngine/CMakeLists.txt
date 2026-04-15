@@ -1087,6 +1087,7 @@ target_include_directories(g_gameengine PRIVATE
 target_link_libraries(g_gameengine PRIVATE
     corei_gameengine_private
     gi_always
+    lib_imgui
 )
 
 target_link_libraries(g_gameengine PUBLIC

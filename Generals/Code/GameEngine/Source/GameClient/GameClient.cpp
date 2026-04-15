@@ -490,6 +490,7 @@ DECLARE_PERF_TIMER(GameClient_draw)
 void GameClient::update()
 {
 	USE_PERF_TIMER(GameClient_update)
+
 	// create the FRAME_TICK message
 	GameMessage *frameMsg = TheMessageStream->appendMessage( GameMessage::MSG_FRAME_TICK );
 	frameMsg->appendTimestampArgument( getFrame() );

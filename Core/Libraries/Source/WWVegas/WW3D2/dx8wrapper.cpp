@@ -87,6 +87,15 @@
 
 #include "shdlib.h"
 
+// TheSuperHackers @feature zhp47 15/04/2026 ImGui debug overlay integration
+#ifdef RTS_HAS_IMGUI
+#include "ImGuiContextManager.h"
+#include "ImGuiFrameManager.h"
+#include "imgui_impl_dx8.h"
+#include <imgui.h>
+static rts::ImGui::ContextManager s_imguiContextManager;
+#endif
+
 const int DEFAULT_RESOLUTION_WIDTH = 640;
 const int DEFAULT_RESOLUTION_HEIGHT = 480;
 const int DEFAULT_BIT_DEPTH = 32;
@@ -595,6 +604,12 @@ bool DX8Wrapper::Create_Device()
 	** Initialize all subsystems
 	*/
 	Do_Onetime_Device_Dependent_Inits();
+
+#ifdef RTS_HAS_IMGUI
+	// TheSuperHackers @feature zhp47 15/04/2026 Initialize ImGui after the D3D device and subsystems are ready.
+	s_imguiContextManager.Init(_Hwnd, D3DDevice);
+#endif
+
 	return true;
 }
 
@@ -618,6 +633,11 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 		DynamicIBAccessClass::_Deinit();
 		DX8TextureManagerClass::Release_Textures();
 		SHD_SHUTDOWN_SHADERS;
+
+#ifdef RTS_HAS_IMGUI
+		// TheSuperHackers @feature zhp47 15/04/2026 Release ImGui GPU resources before D3D device reset.
+		ImGui_ImplDX8_InvalidateDeviceObjects();
+#endif
 
 		// Reset frame count to reflect the flipping chain being reset by Reset()
 		FrameCount = 0;
@@ -644,6 +664,12 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 		Invalidate_Cached_Render_States();
 		Set_Default_Global_Render_States();
 		SHD_INIT_SHADERS;
+
+#ifdef RTS_HAS_IMGUI
+		// TheSuperHackers @feature zhp47 15/04/2026 Recreate ImGui GPU resources after D3D device reset.
+		ImGui_ImplDX8_CreateDeviceObjects();
+#endif
+
 		WWDEBUG_SAY(("Device reset completed"));
 		return true;
 	}
@@ -1661,12 +1687,26 @@ void DX8Wrapper::Begin_Scene()
 
 	DX8CALL(BeginScene());
 
+#ifdef RTS_HAS_IMGUI
+	// TheSuperHackers @feature zhp47 15/04/2026 Start new ImGui frame after D3D scene begins.
+	rts::ImGui::FrameManager::BeginFrame();
+#endif
+
 	DX8WebBrowser::Update();
 }
 
 void DX8Wrapper::End_Scene(bool flip_frames)
 {
 	DX8_THREAD_ASSERT();
+
+#ifdef RTS_HAS_IMGUI
+	// TheSuperHackers @feature zhp47 15/04/2026 Show the ImGui demo window for integration testing.
+	// This is temporary and will be replaced by the debug menu.
+	ImGui::ShowDemoWindow();
+	// TheSuperHackers @feature zhp47 15/04/2026 Finalize and render ImGui draw data before D3D scene ends.
+	rts::ImGui::FrameManager::EndFrame();
+#endif
+
 	DX8CALL(EndScene());
 
 	DX8WebBrowser::Render(0);
