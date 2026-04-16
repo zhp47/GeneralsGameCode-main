@@ -53,6 +53,16 @@ IMGUI_IMPL_API void ImGui_ImplDX8_NewFrame();
 // Renders the ImGui draw data using DX8 draw calls. Call after ImGui::Render().
 IMGUI_IMPL_API void ImGui_ImplDX8_RenderDrawData(ImDrawData *draw_data);
 
+// TheSuperHackers @bugfix zhp47 15/04/2026 Override io.DisplaySize to match the actual DX8
+// backbuffer dimensions. Must be called after ImGui_ImplWin32_NewFrame() (which sets DisplaySize
+// from the HWND client rect) and before ImGui::NewFrame(). When the backbuffer is smaller than
+// the window (common in WorldBuilder fullscreen), this prevents ImGui from projecting into more
+// pixels than the hardware has, which causes pixelated output.
+IMGUI_IMPL_API void ImGui_ImplDX8_AdjustDisplaySize();
+// TheSuperHackers @bugfix zhp47 15/04/2026 Return the HWND-to-backbuffer scale factors.
+// Used by call sites to transform mouse coordinates before passing them to ImGui_ImplWin32_WndProcHandler.
+IMGUI_IMPL_API void ImGui_ImplDX8_GetInputScale(float *scaleX, float *scaleY);
+
 // Called by InvalidateDeviceObjects/CreateDeviceObjects around a D3D device Reset().
 IMGUI_IMPL_API bool ImGui_ImplDX8_CreateDeviceObjects();
 IMGUI_IMPL_API void ImGui_ImplDX8_InvalidateDeviceObjects();

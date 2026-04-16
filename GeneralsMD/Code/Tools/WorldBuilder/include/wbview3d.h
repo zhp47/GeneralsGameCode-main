@@ -211,8 +211,9 @@ private:
 	Bool										m_showWeaponRanges;
 	Bool										m_highlightTestArt;
 	Bool										m_showLetterbox;
-
-
+	Bool											m_hasPendingResize;
+	Int												m_pendingResizeWidth;
+	Int												m_pendingResizeHeight;
 	ID3DXFont*							m3DFont;
 	Int											m_pickPixels;
 	Int											m_partialMapSize;

@@ -59,12 +59,16 @@ struct ImGui_ImplDX8_Data
     int IndexBufferSize;                       // Current capacity of pIB in indices.
     IDirect3DSurface8 *DepthBuffer;            // Dedicated depth/stencil surface for ImGui clipping.
     IDirect3DSurface8 *realDepthStencilBuffer; // Saved pointer to the game's real depth/stencil surface.
+    float InputScaleX;                         // Cached HWND-to-backbuffer X scale for mouse input.
+    float InputScaleY;                         // Cached HWND-to-backbuffer Y scale for mouse input.
 
     ImGui_ImplDX8_Data()
     {
         memset((void *)this, 0, sizeof(*this));
         VertexBufferSize = 5000;
         IndexBufferSize = 10000;
+        InputScaleX = 1.0f;
+        InputScaleY = 1.0f;
     }
 };
 
@@ -99,23 +103,39 @@ void ImGui_ImplDX8_SetupRenderState(ImDrawData *draw_data)
 {
     ImGui_ImplDX8_Data *bd = ImGui_ImplDX8_GetBackendData();
 
+    // TheSuperHackers @bugfix zhp47 15/04/2026 Use DisplaySize for both the viewport and the
+    // projection matrix so that ImGui renders at the correct resolution. The render target
+    // (backbuffer) may differ from the HWND client rect in windowed mode (e.g. WorldBuilder),
+    // and DX8 stretches the backbuffer on Present(). Using the render target dimensions for the
+    // viewport while projecting at DisplaySize causes low-resolution pixelated output.
+    // The viewport is clamped to the backbuffer to satisfy the DX8 requirement that the
+    // viewport must not exceed the render target surface dimensions.
+    DWORD vpW = (DWORD)draw_data->DisplaySize.x;
+    DWORD vpH = (DWORD)draw_data->DisplaySize.y;
+
     IDirect3DSurface8 *pSurface{};
     D3DSURFACE_DESC d3dSize{};
     if (SUCCEEDED(bd->pd3dDevice->GetRenderTarget(&pSurface)) && SUCCEEDED(pSurface->GetDesc(&d3dSize)))
     {
-        // Setup viewport
-        D3DVIEWPORT8 vp{};
-        vp.X = vp.Y = 0;
-        vp.Width = d3dSize.Width;
-        vp.Height = d3dSize.Height;
-        vp.MinZ = 0.0f;
-        vp.MaxZ = 1.0f;
-        bd->pd3dDevice->SetViewport(&vp);
+        if (vpW > d3dSize.Width)
+            vpW = d3dSize.Width;
+        if (vpH > d3dSize.Height)
+            vpH = d3dSize.Height;
     }
     if (pSurface)
     {
         pSurface->Release();
         pSurface = nullptr;
+    }
+
+    {
+        D3DVIEWPORT8 vp{};
+        vp.X = vp.Y = 0;
+        vp.Width = vpW;
+        vp.Height = vpH;
+        vp.MinZ = 0.0f;
+        vp.MaxZ = 1.0f;
+        bd->pd3dDevice->SetViewport(&vp);
     }
 
     // Setup render state: fixed-pipeline, alpha-blending, no face culling, no depth testing, shade mode (for gradient),
@@ -161,11 +181,14 @@ void ImGui_ImplDX8_SetupRenderState(ImDrawData *draw_data)
     // agnostic of whether <d3dx8.h> or <DirectXMath.h> can be used, we aren't relying on
     // D3DXMatrixIdentity()/D3DXMatrixOrthoOffCenterLH() or
     // DirectX::XMMatrixIdentity()/DirectX::XMMatrixOrthographicOffCenterLH()
+    // TheSuperHackers @bugfix zhp47 15/04/2026 Use DisplaySize instead of the render target
+    // dimensions for the projection matrix. After AdjustDisplaySize, DisplaySize matches the
+    // backbuffer, and the ortho projection must use the same coordinate space as the viewport.
     {
         float L = draw_data->DisplayPos.x + 0.5f;
-        float R = draw_data->DisplayPos.x + d3dSize.Width + 0.5f;
+        float R = draw_data->DisplayPos.x + draw_data->DisplaySize.x + 0.5f;
         float T = draw_data->DisplayPos.y + 0.5f;
-        float B = draw_data->DisplayPos.y + d3dSize.Height + 0.5f;
+        float B = draw_data->DisplayPos.y + draw_data->DisplaySize.y + 0.5f;
         D3DMATRIX mat_identity = {{{
             1.0f,
             0.0f,
@@ -660,6 +683,83 @@ void ImGui_ImplDX8_InvalidateDeviceObjects()
     } // We copied bd->pFontTextureView to io.Fonts->TexID so let's clear that as well.
 }
 
+// TheSuperHackers @bugfix zhp47 15/04/2026 Return the cached HWND-to-backbuffer scale factors.
+// Call sites (e.g. WorldBuilder WindowProc) use this to transform mouse coordinates from HWND
+// client space to backbuffer space before they enter ImGui's event queue.
+void ImGui_ImplDX8_GetInputScale(float *scaleX, float *scaleY)
+{
+    ImGui_ImplDX8_Data *bd = ImGui_ImplDX8_GetBackendData();
+    if (bd)
+    {
+        *scaleX = bd->InputScaleX;
+        *scaleY = bd->InputScaleY;
+    }
+    else
+    {
+        *scaleX = 1.0f;
+        *scaleY = 1.0f;
+    }
+}
+
+// TheSuperHackers @bugfix zhp47 15/04/2026 Override io.DisplaySize to match the actual DX8
+// backbuffer dimensions so ImGui generates geometry at backbuffer resolution (crisp text).
+// Also caches the HWND-to-backbuffer scale factors used by ImGui_ImplDX8_GetInputScale(),
+// and injects a final scaled mouse position event to handle the ImGui_ImplWin32_UpdateMouseData
+// fallback path that reads GetCursorPos in HWND coordinates.
+void ImGui_ImplDX8_AdjustDisplaySize()
+{
+    ImGui_ImplDX8_Data *bd = ImGui_ImplDX8_GetBackendData();
+    if (!bd || !bd->pd3dDevice)
+        return;
+
+    IDirect3DSurface8 *pBackBuffer = nullptr;
+    if (FAILED(bd->pd3dDevice->GetRenderTarget(&pBackBuffer)) || !pBackBuffer)
+        return;
+
+    D3DSURFACE_DESC bbDesc{};
+    pBackBuffer->GetDesc(&bbDesc);
+    pBackBuffer->Release();
+
+    ImGuiIO &io = ImGui::GetIO();
+    float hwndW = io.DisplaySize.x;
+    float hwndH = io.DisplaySize.y;
+    float bbW = (float)bbDesc.Width;
+    float bbH = (float)bbDesc.Height;
+
+    if (hwndW > 0.0f && hwndH > 0.0f && (bbW != hwndW || bbH != hwndH))
+    {
+        bd->InputScaleX = bbW / hwndW;
+        bd->InputScaleY = bbH / hwndH;
+
+        // Override DisplaySize so ImGui lays out UI in backbuffer pixel space.
+        io.DisplaySize.x = bbW;
+        io.DisplaySize.y = bbH;
+
+        // TheSuperHackers @bugfix zhp47 16/04/2026 Inject a final scaled mouse position
+        // event. ImGui_ImplWin32_NewFrame may have queued a raw HWND-space position via
+        // GetCursorPos (the UpdateMouseData fallback). We must read the cursor position
+        // directly from the OS rather than scaling io.MousePos, because io.MousePos holds
+        // the PREVIOUS frame's already-scaled value -- scaling it again would compound the
+        // scale factor every frame, causing the position to shrink exponentially toward
+        // (0,0) and making ImGui windows fight against any drag or resize.
+        HWND hwnd = (HWND)ImGui::GetMainViewport()->PlatformHandleRaw;
+        if (hwnd)
+        {
+            POINT pos;
+            if (::GetCursorPos(&pos) && ::ScreenToClient(hwnd, &pos))
+            {
+                io.AddMousePosEvent((float)pos.x * bd->InputScaleX,
+                                    (float)pos.y * bd->InputScaleY);
+            }
+        }
+    }
+    else
+    {
+        bd->InputScaleX = 1.0f;
+        bd->InputScaleY = 1.0f;
+    }
+}
+
 // Called at the start of each frame. Ensures GPU resources exist (creates them lazily on first
 // frame, or re-creates them if they were invalidated by a device reset).
 void ImGui_ImplDX8_NewFrame()
@@ -669,4 +769,27 @@ void ImGui_ImplDX8_NewFrame()
 
     if (!bd->FontTexture || !bd->DepthBuffer)
         ImGui_ImplDX8_CreateDeviceObjects();
+
+    // TheSuperHackers @bugfix zhp47 15/04/2026 Recreate the stencil depth buffer when the
+    // backbuffer size changes (e.g. after a window resize triggers Set_Device_Resolution).
+    // DX8 requires the depth/stencil surface to match the render target dimensions.
+    // Without this, ImGui clipping uses a stale surface from the old resolution.
+    if (bd->DepthBuffer)
+    {
+        D3DSURFACE_DESC depthDesc{};
+        bd->DepthBuffer->GetDesc(&depthDesc);
+
+        IDirect3DSurface8 *pBackBuffer = nullptr;
+        if (SUCCEEDED(bd->pd3dDevice->GetRenderTarget(&pBackBuffer)) && pBackBuffer)
+        {
+            D3DSURFACE_DESC bbDesc{};
+            pBackBuffer->GetDesc(&bbDesc);
+            pBackBuffer->Release();
+
+            if (depthDesc.Width != bbDesc.Width || depthDesc.Height != bbDesc.Height)
+            {
+                ImGui_ImplD3D8_CreateDepthStencilBuffer();
+            }
+        }
+    }
 }

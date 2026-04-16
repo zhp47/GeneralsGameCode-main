@@ -338,6 +338,22 @@ BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs)
 	return TRUE;
 }
 
+// TheSuperHackers @feature zhp47 15/04/2026 Handle F11 at the frame level so the ImGui
+// toggle works regardless of which child widget currently has keyboard focus.
+BOOL CMainFrame::PreTranslateMessage(MSG* pMsg)
+{
+#ifdef RTS_HAS_IMGUI
+	if (pMsg->message == WM_KEYDOWN && pMsg->wParam == VK_F11)
+	{
+		extern bool g_imguiVisible;
+		g_imguiVisible = !g_imguiVisible;
+		return TRUE;
+	}
+#endif
+
+	return CFrameWnd::PreTranslateMessage(pMsg);
+}
+
 void CMainFrame::ResetWindowPositions(void)
 {
 	if (m_curOptions == nullptr) {

@@ -100,6 +100,8 @@
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 extern bool g_imguiVisible;
 #include <imgui.h>
+#include "imgui_impl_dx8.h"
+#include <windowsx.h> // GET_X_LPARAM, GET_Y_LPARAM
 #endif
 
 
@@ -408,7 +410,10 @@ WbView3d::WbView3d() :
 	m_curTrackingZ(10),
 	m_ww3dInited(false),
 	m_showLayersList(false),
-	m_showMapBoundaries(false)
+	m_showMapBoundaries(false),
+	m_hasPendingResize(false),
+	m_pendingResizeWidth(0),
+	m_pendingResizeHeight(0)
 {
 	TheTacticalView = &bogusTacticalView;
 	m_actualWinSize.x = ::AfxGetApp()->GetProfileInt(MAIN_FRAME_SECTION, "Width", THREE_D_VIEW_WIDTH);
@@ -1961,6 +1966,13 @@ void WbView3d::redraw(void)
 		return;
 	}
 
+	// TheSuperHackers @bugfix zhp47 16/04/2026 Process deferred backbuffer resize so DX8
+	// renders at the actual window resolution. This avoids blurry stretched output.
+	if (m_hasPendingResize) {
+		m_hasPendingResize = false;
+		reset3dEngineDisplaySize(m_pendingResizeWidth, m_pendingResizeHeight);
+	}
+
 	setupCamera();
 
 	DEBUG_ASSERTCRASH((m_heightMapRenderObj),("oops"));
@@ -2130,23 +2142,33 @@ BEGIN_MESSAGE_MAP(WbView3d, WbView)
 END_MESSAGE_MAP()
 
 // TheSuperHackers @feature zhp47 15/04/2026 Forward Win32 messages to ImGui for input handling.
-// F11 toggles ImGui visibility. When visible, mouse and keyboard events are forwarded and
-// consumed if ImGui wants them, preventing WorldBuilder tools from receiving stale input.
+// When the overlay is visible, mouse and keyboard events are forwarded and consumed if ImGui
+// wants them, preventing WorldBuilder tools from receiving stale input.
+// The F11 visibility toggle is handled in CMainFrame::PreTranslateMessage so it works
+// regardless of which child widget has keyboard focus.
 LRESULT WbView3d::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
 {
 #ifdef RTS_HAS_IMGUI
-	if (message == WM_KEYDOWN && wParam == VK_F11)
-	{
-		g_imguiVisible = !g_imguiVisible;
-		return 0;
-	}
-
 	if (g_imguiVisible)
 	{
-		ImGui_ImplWin32_WndProcHandler(m_hWnd, message, wParam, lParam);
+		// TheSuperHackers @bugfix zhp47 15/04/2026 Scale mouse coordinates from HWND client space
+		// to backbuffer space before they enter ImGui's event queue. Without this, mouse events are
+		// in HWND resolution while ImGui's DisplaySize is set to the (smaller) backbuffer, causing
+		// mismatched hit-testing and broken interaction (clicks miss, dragging fights back).
+		LPARAM imguiLParam = lParam;
+		bool isMouseMsg = (message >= WM_MOUSEFIRST && message <= WM_MOUSELAST);
+		if (isMouseMsg)
+		{
+			float scaleX = 1.0f, scaleY = 1.0f;
+			ImGui_ImplDX8_GetInputScale(&scaleX, &scaleY);
+			int x = (int)(GET_X_LPARAM(lParam) * scaleX);
+			int y = (int)(GET_Y_LPARAM(lParam) * scaleY);
+			imguiLParam = MAKELPARAM(x, y);
+		}
+
+		ImGui_ImplWin32_WndProcHandler(m_hWnd, message, wParam, imguiLParam);
 
 		const ImGuiIO &io = ImGui::GetIO();
-		bool isMouseMsg = (message >= WM_MOUSEFIRST && message <= WM_MOUSELAST);
 		bool isKeyMsg = (message >= WM_KEYFIRST && message <= WM_KEYLAST) || message == WM_CHAR;
 
 		if ((isMouseMsg && io.WantCaptureMouse) || (isKeyMsg && io.WantCaptureKeyboard))
@@ -2537,6 +2559,13 @@ void WbView3d::OnSize(UINT nType, int cx, int cy)
 {
 	WbView::OnSize(nType, cx, cy);
 
+	// TheSuperHackers @bugfix zhp47 16/04/2026 Defer backbuffer resize to the render loop
+	// to avoid DX8 Reset_Device failures during MFC window creation.
+	if (cx > 0 && cy > 0) {
+		m_pendingResizeWidth = cx;
+		m_pendingResizeHeight = cy;
+		m_hasPendingResize = true;
+	}
 }
 
 // ----------------------------------------------------------------------------

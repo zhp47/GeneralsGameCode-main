@@ -159,7 +159,11 @@ void rts::ImGui::ContextManager::Init(void *hwnd, void *device)
         return;
     }
 
-    io.Fonts->AddFontDefault();
+    // TheSuperHackers @tweak zhp47 15/04/2026 Use a larger default font (18px instead of 13px)
+    // for readability in windowed tools like WorldBuilder where the backbuffer may be stretched.
+    ImFontConfig fontCfg;
+    fontCfg.SizePixels = 18.0f;
+    io.Fonts->AddFontDefault(&fontCfg);
 
     m_initialized = true;
 }

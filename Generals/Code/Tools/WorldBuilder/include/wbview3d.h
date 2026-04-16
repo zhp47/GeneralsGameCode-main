@@ -200,8 +200,9 @@ private:
 	Bool										m_showLayersList;	///< Flag whether the layers list is visible or not.
 	Bool										m_showMapBoundaries;	///< Flag whether to show all the map boundaries or not
 	Bool										m_showAmbientSounds;	///< Flag whether to show all the ambient sounds or not
-
-
+	Bool											m_hasPendingResize;
+	Int												m_pendingResizeWidth;
+	Int												m_pendingResizeHeight;
 	ID3DXFont*							m3DFont;
 	Int											m_pickPixels;
 	Int											m_partialMapSize;

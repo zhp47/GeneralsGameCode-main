@@ -37,6 +37,9 @@ void rts::ImGui::FrameManager::BeginFrame()
 
     ImGui_ImplDX8_NewFrame();
     ImGui_ImplWin32_NewFrame();
+    // TheSuperHackers @bugfix zhp47 15/04/2026 Sync io.DisplaySize with the actual DX8 backbuffer
+    // after Win32 sets it from the HWND. Prevents pixelated rendering when backbuffer < window.
+    ImGui_ImplDX8_AdjustDisplaySize();
     ::ImGui::NewFrame();
 
     s_frameOpen = true;
